@@ -3,7 +3,7 @@ import math
 from ortools.graph.python import min_cost_flow
 import numpy as np
 
-from agent_and_target_clustering.additional_functions import euclidean
+from additional_functions import euclidean
 from astar import a_star
 
 from grid_world_env import gridworld_env
