@@ -264,7 +264,7 @@ def assign_targets_to_lvl1_clusters(env, logging):
     return list_of_lvl1_cluster_heads
 
 
-def generate_trajectories(instance_id = None, seed = None, iteration = 1, num_epochs = 1):
+def generate_trajectories(instance_id = None, seed = None, iteration = 1, num_epochs = 1, computation_bool = False):
     # os.makedirs('saved_environments', exist_ok=True)
     log_file = 'clustering_solver.log'
     logging.basicConfig(
@@ -301,70 +301,140 @@ def generate_trajectories(instance_id = None, seed = None, iteration = 1, num_ep
 
         env.cluster_step()
         env.render()
-
+        
+        all_routes = {}
         while not done:  # Continue until the experiment ends
-            # need to assign targets to each level 1 cluster
-            # lvl1_cluster_heads = assign_targets_to_lvl1_clusters(env, logging=logging)
-            lvl1_cluster_heads = assign_targets_to_lvl1_clusters_OR_tools(env, route_solver, logging=logging)
+            if not computation_bool: # Update route each step
+                # need to assign targets to each level 1 cluster
+                # lvl1_cluster_heads = assign_targets_to_lvl1_clusters(env, logging=logging)
+                lvl1_cluster_heads = assign_targets_to_lvl1_clusters_OR_tools(env, route_solver, logging=logging)
 
-            # need to get manager, routing, solution for every level 1 cluster
-            all_routes = {}
-            # for each level 1 cluster head, solve the open-ended VRP
-            print(f"Solving open-ended VRP")
-            logging.info("Solving open-ended VRP")
-            for agent in lvl1_cluster_heads:
-                distance_matrix, num_agents, manager, routing, solution = route_solver.solve_open_ended_vrp(agent)
-                routes = route_solver.get_routes_as_dict(manager, routing, solution, num_agents)
+                # need to get manager, routing, solution for every level 1 cluster
+                all_routes = {}
+                # for each level 1 cluster head, solve the open-ended VRP
+                print(f"Solving open-ended VRP")
+                logging.info("Solving open-ended VRP")
+                for agent in lvl1_cluster_heads:
+                    distance_matrix, num_agents, manager, routing, solution = route_solver.solve_open_ended_vrp(agent)
+                    routes = route_solver.get_routes_as_dict(manager, routing, solution, num_agents)
 
-                # these need to be assigned targets
+                    # these need to be assigned targets
 
-                assigned_targets = [target_id for target_id in agent.assigned_target_ids]
+                    assigned_targets = [target_id for target_id in agent.assigned_target_ids]
 
-                # need to relabel the route agent_ids
-                cluster_member_ids = [member.id for member in agent.clusterHeadToken.members_]
-                cluster_member_ids.append(agent.id)  # Add the agent itself in the cluster
+                    # need to relabel the route agent_ids
+                    cluster_member_ids = [member.id for member in agent.clusterHeadToken.members_]
+                    cluster_member_ids.append(agent.id)  # Add the agent itself in the cluster
 
-                # the routes consist of actual target IDs assigned to the actual agent IDs in the  cluster
-                relabelled_routes = {
-                    cluster_member_ids[agent_id]: [assigned_targets[index] for index in route]
-                    for agent_id, route in routes.items()
-                }
-                print(f"Agent {agent.id} relabelled routes: {relabelled_routes}")
-                logging.info(f"Agent {agent.id} relabelled routes: {relabelled_routes}")
-                print(f"Assigned targets for agent {agent.id}: {assigned_targets}")
-                logging.info(f"Assigned targets for agent {agent.id}: {assigned_targets}")
+                    # the routes consist of actual target IDs assigned to the actual agent IDs in the  cluster
+                    relabelled_routes = {
+                        cluster_member_ids[agent_id]: [assigned_targets[index] for index in route]
+                        for agent_id, route in routes.items()
+                    }
+                    print(f"Agent {agent.id} relabelled routes: {relabelled_routes}")
+                    logging.info(f"Agent {agent.id} relabelled routes: {relabelled_routes}")
+                    print(f"Assigned targets for agent {agent.id}: {assigned_targets}")
+                    logging.info(f"Assigned targets for agent {agent.id}: {assigned_targets}")
 
-                for agent_id, route in relabelled_routes.items():
-                    if route:
-                        all_routes[agent_id] = route
+                    for agent_id, route in relabelled_routes.items():
+                        if route:
+                            all_routes[agent_id] = route
 
-            # input("Routes displayed.  Press Enter to continue...")
+                # input("Routes displayed.  Press Enter to continue...")
 
-            # Clear assigned targets for the next iteration
-            for agent in lvl1_cluster_heads:
-                agent.assigned_target_ids = []
+                # Clear assigned targets for the next iteration
+                for agent in lvl1_cluster_heads:
+                    agent.assigned_target_ids = []
 
-            # Initialize first_targets with the null target for all agents
-            first_targets = [env.num_targets] * env.num_agents  # Null target is represented by env.num_targets
-            agents = [agent for agent, route in all_routes.items() if route]
+                # Initialize first_targets with the null target for all agents
+                first_targets = [env.num_targets] * env.num_agents  # Null target is represented by env.num_targets
+                agents = [agent for agent, route in all_routes.items() if route]
 
-            # Update first_targets for agents with non-empty routes
-            # need to change things if the agent is currently on the target
-            for agent_id, route in zip(agents, [route for route in all_routes.values() if route]):
-                agent_position_cell = env.convert_position_to_grid_cell(env.agent_positions[agent_id])
-                first_target_cell = env.convert_position_to_grid_cell(env.target_positions[route[0]])
-                if agent_position_cell == first_target_cell:
-                    print(f"Agent {agent_id} is already at the first target {route[0]}. Marking as visited.")
-                    logging.info(f"Agent {agent_id} is already at the first target {route[0]}. Marking as visited.")
-                    env.target_mask[route[0]] = True  # Mark the target as visited
-                    if len(route) > 1:
-                        first_targets[agent_id] = route[1]
+                # Update first_targets for agents with non-empty routes
+                # need to change things if the agent is currently on the target
+                for agent_id, route in zip(agents, [route for route in all_routes.values() if route]):
+                    agent_position_cell = env.convert_position_to_grid_cell(env.agent_positions[agent_id])
+                    first_target_cell = env.convert_position_to_grid_cell(env.target_positions[route[0]])
+                    if agent_position_cell == first_target_cell:
+                        print(f"Agent {agent_id} is already at the first target {route[0]}. Marking as visited.")
+                        logging.info(f"Agent {agent_id} is already at the first target {route[0]}. Marking as visited.")
+                        env.target_mask[route[0]] = True  # Mark the target as visited
+                        if len(route) > 1:
+                            first_targets[agent_id] = route[1]
+                        else:
+                            first_targets[agent_id] = env.num_targets
+                        print(f"Agent {agent_id} first target updated to {first_targets[agent_id]}")
+                        logging.info(f"Agent {agent_id} first target updated to {first_targets[agent_id]}")
                     else:
-                        first_targets[agent_id] = env.num_targets
-                    print(f"Agent {agent_id} first target updated to {first_targets[agent_id]}")
-                    logging.info(f"Agent {agent_id} first target updated to {first_targets[agent_id]}")
-                else:
-                    first_targets[agent_id] = route[0]
+                        first_targets[agent_id] = route[0]
+
+            else: # Update route depnding on how long the route takes to compute
+                # need to assign targets to each level 1 cluster
+                lvl1_cluster_heads = assign_targets_to_lvl1_clusters_OR_tools(env, route_solver, logging=logging)
+
+                # need to get manager, routing, solution for every level 1 cluster
+                # all_routes = {}
+                # for each level 1 cluster head, solve the open-ended VRP
+                print(f"Solving open-ended VRP")
+                logging.info("Solving open-ended VRP")
+                for agent in lvl1_cluster_heads:
+                    if agent.clusterHeadToken.computationCounter <= 0:
+                        start_time = time.time()
+
+                        distance_matrix, num_agents, manager, routing, solution = route_solver.solve_open_ended_vrp(agent)
+                        routes = route_solver.get_routes_as_dict(manager, routing, solution, num_agents)
+
+                        # these need to be assigned targets
+
+                        assigned_targets = [target_id for target_id in agent.assigned_target_ids]
+
+                        # need to relabel the route agent_ids
+                        cluster_member_ids = [member.id for member in agent.clusterHeadToken.members_]
+                        cluster_member_ids.append(agent.id)  # Add the agent itself in the cluster
+
+                        # the routes consist of actual target IDs assigned to the actual agent IDs in the  cluster
+                        relabelled_routes = {
+                            cluster_member_ids[agent_id]: [assigned_targets[index] for index in route]
+                            for agent_id, route in routes.items()
+                        }
+                        print(f"Agent {agent.id} relabelled routes: {relabelled_routes}")
+                        logging.info(f"Agent {agent.id} relabelled routes: {relabelled_routes}")
+                        print(f"Assigned targets for agent {agent.id}: {assigned_targets}")
+                        logging.info(f"Assigned targets for agent {agent.id}: {assigned_targets}")
+
+                        for agent_id, route in relabelled_routes.items():
+                            if route:
+                                all_routes[agent_id] = route
+                        agent.clusterHeadToken.set_computation_counter(start_time)
+                        print(f'Agent {agent.id} computation time: {agent.clusterHeadToken.computationCounter_}')
+                # input("Routes displayed.  Press Enter to continue...")
+
+                # Clear assigned targets for the next iteration
+                for agent in lvl1_cluster_heads:
+                    agent.assigned_target_ids = []
+                    agent.clusterHeadToken.set_computation_counter()
+
+                # Initialize first_targets with the null target for all agents
+                first_targets = [env.num_targets] * env.num_agents  # Null target is represented by env.num_targets
+                agents = [agent for agent, route in all_routes.items() if route]
+
+                # Update first_targets for agents with non-empty routes
+                # need to change things if the agent is currently on the target
+                for agent_id, route in zip(agents, [route for route in all_routes.values() if route]):
+                    agent_position_cell = env.convert_position_to_grid_cell(env.agent_positions[agent_id])
+                    first_target_cell = env.convert_position_to_grid_cell(env.target_positions[route[0]])
+                    if agent_position_cell == first_target_cell:
+                        print(f"Agent {agent_id} is already at the first target {route[0]}. Marking as visited.")
+                        logging.info(f"Agent {agent_id} is already at the first target {route[0]}. Marking as visited.")
+                        env.target_mask[route[0]] = True  # Mark the target as visited
+                        if len(route) > 1:
+                            first_targets[agent_id] = route[1]
+                        else:
+                            first_targets[agent_id] = env.num_targets
+                        print(f"Agent {agent_id} first target updated to {first_targets[agent_id]}")
+                        logging.info(f"Agent {agent_id} first target updated to {first_targets[agent_id]}")
+                    else:
+                        first_targets[agent_id] = route[0]
 
             filtered_agent_cell_positions = [
                 env.convert_position_to_grid_cell(position) for position in env.agent_positions

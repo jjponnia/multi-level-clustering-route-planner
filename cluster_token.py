@@ -1,4 +1,5 @@
 import numpy as np
+import time
 # from agent import Agent
 from additional_functions import chebyshev_distance
 from additional_functions import euclidean
@@ -26,7 +27,9 @@ class ClusterToken(Cluster):
         self.members_ = []
 
         self.higherCluster_ = None
+
         self.periodicMaintenanceCounter_ = 0
+        self.computationCounter_ = 0
 
         self.centroid_ = self.update_centroid() if self.members_ else None
 
@@ -92,6 +95,12 @@ class ClusterToken(Cluster):
     
     def reset_counter(self):
         self.periodicMaintenanceCounter_ = 0
+    
+    def set_computation_counter(self, start_time=None):
+        if start_time:
+            self.computationCounter_ = time.time() - start_time
+        else:
+            self.computationCounter_ -= 5
 
     def cluster_maintenance(self):
         self.reset_counter()
