@@ -3,7 +3,7 @@ import math
 from ortools.graph.python import min_cost_flow
 import numpy as np
 
-from agent_and_target_clustering.additional_functions import euclidean
+from additional_functions import euclidean
 from astar import a_star
 
 from grid_world_env import gridworld_env
@@ -178,7 +178,7 @@ class ClusteringTSP:
         search_parameters = pywrapcp.DefaultRoutingSearchParameters()
         search_parameters.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
         search_parameters.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
-        search_parameters.time_limit.seconds = 10
+        search_parameters.time_limit.seconds = 3
 
         # Solve
         solution = routing.SolveWithParameters(search_parameters)
